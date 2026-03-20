@@ -1,0 +1,7 @@
+method: ECC
+score: 0.22029841025575858
+motion: translation
+dapi_channel: b
+warp_matrix:
+1.00000000 0.00000000 0.86645520
+0.00000000 1.00000000 -9.62277889
