@@ -1,0 +1,34 @@
+input_folder: ColorDeck_test image
+output_dir: ColorDeck_test image\merged_output_20260323_092917
+reference_image: 1_Spleen_DAPI_Lamin B1_RF 775_下_20.0x.jpg
+motion: translation
+dapi_channel: b
+
+[1_Spleen_DAPI_Lamin B1_RF 775_下_20.0x.jpg]
+method: reference
+score: 1.0
+warp_matrix:
+1.00000000 0.00000000 0.00000000
+0.00000000 1.00000000 0.00000000
+
+[2_Spleen_DAPI_CD3_RF 675_下_20.0x.jpg]
+method: ECC
+score: 0.9222711126249744
+warp_matrix:
+1.00000000 0.00000000 0.19117570
+0.00000000 1.00000000 0.00118109
+
+[3_Spleen_DAPI_CD68_RF 525_下_20.0x.jpg]
+method: ECC
+score: 0.9483648808587375
+warp_matrix:
+1.00000000 0.00000000 0.40764067
+0.00000000 1.00000000 0.36252940
+
+[4_Spleen_DAPI_kI67_RF 555_下_20.0x.jpg]
+method: ECC
+score: 0.9483464457829798
+warp_matrix:
+1.00000000 0.00000000 0.41207996
+0.00000000 1.00000000 0.35141054
+

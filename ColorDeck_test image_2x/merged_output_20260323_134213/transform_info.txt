@@ -1,0 +1,34 @@
+input_folder: ColorDeck_test image_2x
+output_dir: ColorDeck_test image_2x\merged_output_20260323_134213
+reference_image: Spleen_CD68_RF 525_下_2.0x.jpg
+motion: translation
+dapi_channel: b
+
+[Spleen_CD68_RF 525_下_2.0x.jpg]
+method: reference
+score: 1.0
+warp_matrix:
+1.00000000 0.00000000 0.00000000
+0.00000000 1.00000000 0.00000000
+
+[Spleen_CD 3_RF 675_下_2.0x.jpg]
+method: ECC
+score: 0.9586819102361471
+warp_matrix:
+1.00000000 0.00000000 -0.11064526
+0.00000000 1.00000000 -0.12559681
+
+[Spleen_Ki67_RF 555_下_2.0x.jpg]
+method: ECC
+score: 0.9997036960662874
+warp_matrix:
+1.00000000 0.00000000 -0.00225198
+0.00000000 1.00000000 0.00008571
+
+[Spleen_Lamin B1_RF 775_下_2.0x.jpg]
+method: ECC
+score: 0.9535746669180436
+warp_matrix:
+1.00000000 0.00000000 0.02111208
+0.00000000 1.00000000 -0.28169122
+

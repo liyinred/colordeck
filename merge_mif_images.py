@@ -1,4 +1,5 @@
 import argparse
+from datetime import datetime
 from pathlib import Path
 
 import cv2
@@ -20,10 +21,18 @@ MOTION_MAP = {
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Align and merge two multiplex immunofluorescence images using their shared DAPI channel."
+        description="Align and merge all multiplex immunofluorescence images in a folder using a reference image."
     )
-    parser.add_argument("--round1", default="1_round.jpg", help="First-round image path.")
-    parser.add_argument("--round2", default="2_round.jpg", help="Second-round image path.")
+    parser.add_argument(
+        "--input-folder",
+        default="ColorDeck_test image",
+        help="Folder containing the images to align and merge.",
+    )
+    parser.add_argument(
+        "--reference-image",
+        default="1_Spleen_DAPI_Lamin B1_RF 775_下_20.0x.jpg",
+        help="Filename of the reference image inside the input folder.",
+    )
     parser.add_argument(
         "--dapi-channel",
         default="b",
@@ -38,17 +47,26 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--output-dir",
-        default="output",
-        help="Directory to save the registered and merged images.",
+        default="merged_output",
+        help="Output folder name inside the input folder. Absolute paths are also supported.",
     )
     return parser.parse_args()
 
 
 def load_image(path: str) -> np.ndarray:
-    image = cv2.imread(path, cv2.IMREAD_COLOR)
+    data = np.fromfile(path, dtype=np.uint8)
+    image = cv2.imdecode(data, cv2.IMREAD_COLOR)
     if image is None:
         raise FileNotFoundError(f"Failed to read image: {path}")
     return image
+
+
+def save_image(path: Path, image: np.ndarray) -> None:
+    suffix = path.suffix or ".png"
+    success, encoded = cv2.imencode(suffix, image)
+    if not success:
+        raise OSError(f"Failed to encode image for saving: {path}")
+    encoded.tofile(path)
 
 
 def normalize_for_registration(channel: np.ndarray) -> np.ndarray:
@@ -122,68 +140,136 @@ def create_registration_preview(fixed: np.ndarray, aligned: np.ndarray) -> np.nd
     fixed_norm = cv2.normalize(fixed, None, 0, 255, cv2.NORM_MINMAX).astype(np.uint8)
     aligned_norm = cv2.normalize(aligned, None, 0, 255, cv2.NORM_MINMAX).astype(np.uint8)
     zero = np.zeros_like(fixed_norm)
-    # Red = round1 DAPI, Green = aligned round2 DAPI, Yellow = overlap.
+    # Red = reference DAPI, Green = aligned moving DAPI, Yellow = overlap.
     return cv2.merge([zero, aligned_norm, fixed_norm])
+
+
+def list_image_files(folder: Path) -> list[Path]:
+    supported_suffixes = {".jpg", ".jpeg", ".png", ".tif", ".tiff", ".bmp"}
+    return sorted(
+        path for path in folder.iterdir() if path.is_file() and path.suffix.lower() in supported_suffixes
+    )
+
+
+def build_timestamped_output_dir(input_folder: Path, output_dir_arg: str) -> Path:
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    output_dir = Path(output_dir_arg)
+
+    if output_dir.is_absolute():
+        parent = output_dir.parent
+        base_name = output_dir.name
+    else:
+        parent = input_folder
+        base_name = output_dir_arg
+
+    return parent / f"{base_name}_{timestamp}"
 
 
 def main() -> None:
     args = parse_args()
-    output_dir = Path(args.output_dir)
+    input_folder = Path(args.input_folder)
+    if not input_folder.is_dir():
+        raise FileNotFoundError(f"Input folder does not exist: {input_folder}")
+
+    output_dir = build_timestamped_output_dir(input_folder, args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    round1 = load_image(args.round1)
-    round2 = load_image(args.round2)
+    image_paths = list_image_files(input_folder)
+    if not image_paths:
+        raise FileNotFoundError(f"No supported image files found in folder: {input_folder}")
 
-    if round1.shape != round2.shape:
-        raise ValueError(
-            f"Input images must have the same size, got {round1.shape} and {round2.shape}."
-        )
+    reference_path = input_folder / args.reference_image
+    if not reference_path.is_file():
+        raise FileNotFoundError(f"Reference image not found: {reference_path}")
+
+    if reference_path not in image_paths:
+        image_paths.append(reference_path)
+        image_paths.sort()
+
+    reference_image = load_image(str(reference_path))
 
     channel_idx = CHANNEL_MAP[args.dapi_channel]
     motion_type = MOTION_MAP[args.motion]
 
-    dapi1 = normalize_for_registration(round1[:, :, channel_idx])
-    dapi2 = normalize_for_registration(round2[:, :, channel_idx])
+    reference_dapi = normalize_for_registration(reference_image[:, :, channel_idx])
+    h, w = reference_image.shape[:2]
 
-    try:
-        warp, score = estimate_transform_ecc(dapi1, dapi2, motion_type)
-        method = "ECC"
-    except cv2.error:
-        if motion_type != cv2.MOTION_TRANSLATION:
-            raise
-        warp, score = estimate_transform_phase_correlation(dapi1, dapi2)
-        method = "phase_correlation"
+    aligned_dir = output_dir / "aligned_images"
+    preview_dir = output_dir / "registration_previews"
+    aligned_dir.mkdir(parents=True, exist_ok=True)
+    preview_dir.mkdir(parents=True, exist_ok=True)
 
-    h, w = round1.shape[:2]
-    aligned_round2 = warp_image(round2, warp, motion_type, (w, h))
-    aligned_dapi2 = warp_image(round2[:, :, channel_idx], warp, motion_type, (w, h))
-
-    merged = np.maximum(round1, aligned_round2)
-    preview = create_registration_preview(round1[:, :, channel_idx], aligned_dapi2)
-
-    aligned_path = output_dir / "round2_aligned.png"
+    merged = reference_image.copy()
     merged_path = output_dir / "merged_image.png"
-    preview_path = output_dir / "registration_check.png"
     info_path = output_dir / "transform_info.txt"
-
-    cv2.imwrite(str(aligned_path), aligned_round2)
-    cv2.imwrite(str(merged_path), merged)
-    cv2.imwrite(str(preview_path), preview)
+    reference_copy_path = aligned_dir / reference_path.name
+    save_image(reference_copy_path, reference_image)
 
     with info_path.open("w", encoding="utf-8") as f:
-        f.write(f"method: {method}\n")
-        f.write(f"score: {score}\n")
+        f.write(f"input_folder: {input_folder}\n")
+        f.write(f"output_dir: {output_dir}\n")
+        f.write(f"reference_image: {reference_path.name}\n")
         f.write(f"motion: {args.motion}\n")
         f.write(f"dapi_channel: {args.dapi_channel}\n")
+        f.write("\n")
+        f.write(f"[{reference_path.name}]\n")
+        f.write("method: reference\n")
+        f.write("score: 1.0\n")
         f.write("warp_matrix:\n")
-        for row in warp:
-            f.write(" ".join(f"{value:.8f}" for value in row) + "\n")
+        f.write("1.00000000 0.00000000 0.00000000\n")
+        f.write("0.00000000 1.00000000 0.00000000\n\n")
 
-    print(f"Registration method: {method}")
-    print(f"Registration score: {score}")
-    print(f"Aligned round-2 image: {aligned_path}")
+        for image_path in image_paths:
+            if image_path == reference_path:
+                continue
+
+            moving_image = load_image(str(image_path))
+            if moving_image.shape != reference_image.shape:
+                raise ValueError(
+                    f"Input images must have the same size as the reference image, "
+                    f"got {moving_image.shape} and {reference_image.shape} for {image_path.name}."
+                )
+
+            moving_dapi = normalize_for_registration(moving_image[:, :, channel_idx])
+
+            try:
+                warp, score = estimate_transform_ecc(reference_dapi, moving_dapi, motion_type)
+                method = "ECC"
+            except cv2.error:
+                if motion_type != cv2.MOTION_TRANSLATION:
+                    raise
+                warp, score = estimate_transform_phase_correlation(reference_dapi, moving_dapi)
+                method = "phase_correlation"
+
+            aligned_image = warp_image(moving_image, warp, motion_type, (w, h))
+            aligned_dapi = warp_image(moving_image[:, :, channel_idx], warp, motion_type, (w, h))
+            preview = create_registration_preview(reference_image[:, :, channel_idx], aligned_dapi)
+
+            merged = np.maximum(merged, aligned_image)
+
+            aligned_path = aligned_dir / image_path.name
+            preview_path = preview_dir / f"{image_path.stem}_registration_check.png"
+            save_image(aligned_path, aligned_image)
+            save_image(preview_path, preview)
+
+            f.write(f"[{image_path.name}]\n")
+            f.write(f"method: {method}\n")
+            f.write(f"score: {score}\n")
+            f.write("warp_matrix:\n")
+            for row in warp:
+                f.write(" ".join(f"{value:.8f}" for value in row) + "\n")
+            f.write("\n")
+
+            print(f"Processed image: {image_path.name}")
+            print(f"Registration method: {method}")
+            print(f"Registration score: {score}")
+            print(f"Aligned image: {aligned_path}")
+            print(f"Registration preview: {preview_path}")
+
+    save_image(merged_path, merged)
+    print(f"Output directory: {output_dir}")
+    print(f"Reference image copied to: {reference_copy_path}")
     print(f"Merged image: {merged_path}")
-    print(f"Registration preview: {preview_path}")
     print(f"Transform info: {info_path}")
 
 
