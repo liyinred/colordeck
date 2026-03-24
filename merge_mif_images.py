@@ -69,6 +69,25 @@ def save_image(path: Path, image: np.ndarray) -> None:
     encoded.tofile(path)
 
 
+def match_image_size(image: np.ndarray, target_size: tuple[int, int]) -> tuple[np.ndarray, str]:
+    target_h, target_w = target_size
+    src_h, src_w = image.shape[:2]
+
+    if (src_h, src_w) == (target_h, target_w):
+        return image, "none"
+
+    if src_h >= target_h and src_w >= target_w:
+        top = (src_h - target_h) // 2
+        left = (src_w - target_w) // 2
+        cropped = image[top : top + target_h, left : left + target_w]
+        if cropped.shape[:2] == (target_h, target_w):
+            return cropped, f"center_crop ({src_h}x{src_w} -> {target_h}x{target_w})"
+
+    interpolation = cv2.INTER_AREA if src_h >= target_h or src_w >= target_w else cv2.INTER_LINEAR
+    resized = cv2.resize(image, (target_w, target_h), interpolation=interpolation)
+    return resized, f"resize ({src_h}x{src_w} -> {target_h}x{target_w})"
+
+
 def normalize_for_registration(channel: np.ndarray) -> np.ndarray:
     channel = channel.astype(np.float32)
     if channel.max() == channel.min():
@@ -211,10 +230,12 @@ def main() -> None:
         f.write(f"reference_image: {reference_path.name}\n")
         f.write(f"motion: {args.motion}\n")
         f.write(f"dapi_channel: {args.dapi_channel}\n")
+        f.write(f"reference_size: {h}x{w}\n")
         f.write("\n")
         f.write(f"[{reference_path.name}]\n")
         f.write("method: reference\n")
         f.write("score: 1.0\n")
+        f.write("size_adjustment: none\n")
         f.write("warp_matrix:\n")
         f.write("1.00000000 0.00000000 0.00000000\n")
         f.write("0.00000000 1.00000000 0.00000000\n\n")
@@ -224,11 +245,7 @@ def main() -> None:
                 continue
 
             moving_image = load_image(str(image_path))
-            if moving_image.shape != reference_image.shape:
-                raise ValueError(
-                    f"Input images must have the same size as the reference image, "
-                    f"got {moving_image.shape} and {reference_image.shape} for {image_path.name}."
-                )
+            moving_image, size_adjustment = match_image_size(moving_image, (h, w))
 
             moving_dapi = normalize_for_registration(moving_image[:, :, channel_idx])
 
@@ -255,12 +272,14 @@ def main() -> None:
             f.write(f"[{image_path.name}]\n")
             f.write(f"method: {method}\n")
             f.write(f"score: {score}\n")
+            f.write(f"size_adjustment: {size_adjustment}\n")
             f.write("warp_matrix:\n")
             for row in warp:
                 f.write(" ".join(f"{value:.8f}" for value in row) + "\n")
             f.write("\n")
 
             print(f"Processed image: {image_path.name}")
+            print(f"Size adjustment: {size_adjustment}")
             print(f"Registration method: {method}")
             print(f"Registration score: {score}")
             print(f"Aligned image: {aligned_path}")
