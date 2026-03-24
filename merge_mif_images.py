@@ -163,6 +163,84 @@ def create_registration_preview(fixed: np.ndarray, aligned: np.ndarray) -> np.nd
     return cv2.merge([zero, aligned_norm, fixed_norm])
 
 
+def fit_image_to_box(image: np.ndarray, max_width: int, max_height: int) -> np.ndarray:
+    src_h, src_w = image.shape[:2]
+    if src_h == 0 or src_w == 0:
+        raise ValueError("Image must have non-zero dimensions.")
+
+    scale = min(max_width / src_w, max_height / src_h)
+    new_w = max(1, int(round(src_w * scale)))
+    new_h = max(1, int(round(src_h * scale)))
+    interpolation = cv2.INTER_AREA if scale < 1 else cv2.INTER_LINEAR
+    return cv2.resize(image, (new_w, new_h), interpolation=interpolation)
+
+
+def ellipsize_text(text: str, max_width: int, font_scale: float, thickness: int) -> str:
+    if cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, font_scale, thickness)[0][0] <= max_width:
+        return text
+
+    ellipsis = "..."
+    truncated = text
+    while truncated:
+        truncated = truncated[:-1]
+        candidate = f"{truncated}{ellipsis}"
+        if cv2.getTextSize(candidate, cv2.FONT_HERSHEY_SIMPLEX, font_scale, thickness)[0][0] <= max_width:
+            return candidate
+    return ellipsis
+
+
+def create_overview_panel(images: list[tuple[str, np.ndarray]]) -> np.ndarray:
+    if not images:
+        raise ValueError("At least one image is required to create an overview panel.")
+
+    cell_width = 420
+    cell_height = 420
+    title_height = 30
+    margin = 24
+    title_font_scale = 0.68
+    title_thickness = 1
+    content_padding = 8
+    columns = 3 if len(images) > 4 else 2
+    rows = (len(images) + columns - 1) // columns
+
+    canvas_height = margin + rows * (cell_height + title_height + margin)
+    canvas_width = margin + columns * (cell_width + margin)
+    canvas = np.full((canvas_height, canvas_width, 3), 245, dtype=np.uint8)
+
+    for idx, (title, image) in enumerate(images):
+        row = idx // columns
+        col = idx % columns
+
+        x = margin + col * (cell_width + margin)
+        y = margin + row * (cell_height + title_height + margin)
+
+        display_title = ellipsize_text(title, cell_width - 24, title_font_scale, title_thickness)
+        (text_width, text_height), text_baseline = cv2.getTextSize(
+            display_title, cv2.FONT_HERSHEY_SIMPLEX, title_font_scale, title_thickness
+        )
+        cv2.putText(
+            canvas,
+            display_title,
+            (
+                x + (cell_width - text_width) // 2,
+                y + text_height + max(1, (title_height - text_height - text_baseline) // 2),
+            ),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            title_font_scale,
+            (40, 40, 40),
+            title_thickness,
+            cv2.LINE_AA,
+        )
+
+        fitted = fit_image_to_box(image, cell_width - content_padding * 2, cell_height - content_padding * 2)
+        fitted_h, fitted_w = fitted.shape[:2]
+        image_x = x + (cell_width - fitted_w) // 2
+        image_y = y + title_height + (cell_height - fitted_h) // 2
+        canvas[image_y : image_y + fitted_h, image_x : image_x + fitted_w] = fitted
+
+    return canvas
+
+
 def list_image_files(folder: Path) -> list[Path]:
     supported_suffixes = {".jpg", ".jpeg", ".png", ".tif", ".tiff", ".bmp"}
     return sorted(
@@ -220,14 +298,17 @@ def main() -> None:
 
     merged = reference_image.copy()
     merged_path = output_dir / "merged_image.png"
+    overview_path = output_dir / "input_and_merged_overview.png"
     info_path = output_dir / "transform_info.txt"
     reference_copy_path = aligned_dir / reference_path.name
     save_image(reference_copy_path, reference_image)
+    overview_items: list[tuple[str, np.ndarray]] = [(reference_path.name, reference_image)]
 
     with info_path.open("w", encoding="utf-8") as f:
         f.write(f"input_folder: {input_folder}\n")
         f.write(f"output_dir: {output_dir}\n")
         f.write(f"reference_image: {reference_path.name}\n")
+        f.write(f"overview_image: {overview_path.name}\n")
         f.write(f"motion: {args.motion}\n")
         f.write(f"dapi_channel: {args.dapi_channel}\n")
         f.write(f"reference_size: {h}x{w}\n")
@@ -245,6 +326,7 @@ def main() -> None:
                 continue
 
             moving_image = load_image(str(image_path))
+            overview_items.append((image_path.name, moving_image.copy()))
             moving_image, size_adjustment = match_image_size(moving_image, (h, w))
 
             moving_dapi = normalize_for_registration(moving_image[:, :, channel_idx])
@@ -286,9 +368,12 @@ def main() -> None:
             print(f"Registration preview: {preview_path}")
 
     save_image(merged_path, merged)
+    overview_panel = create_overview_panel([*overview_items, ("Merged Result", merged)])
+    save_image(overview_path, overview_panel)
     print(f"Output directory: {output_dir}")
     print(f"Reference image copied to: {reference_copy_path}")
     print(f"Merged image: {merged_path}")
+    print(f"Overview image: {overview_path}")
     print(f"Transform info: {info_path}")
 
 

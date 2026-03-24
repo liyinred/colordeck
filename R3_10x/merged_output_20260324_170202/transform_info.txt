@@ -1,0 +1,40 @@
+input_folder: R3_10x
+output_dir: R3_10x\merged_output_20260324_170202
+reference_image: R1_CD3_RF 675+DAPI.jpg
+overview_image: input_and_merged_overview.png
+motion: translation
+dapi_channel: b
+reference_size: 1856x2320
+
+[R1_CD3_RF 675+DAPI.jpg]
+method: reference
+score: 1.0
+size_adjustment: none
+warp_matrix:
+1.00000000 0.00000000 0.00000000
+0.00000000 1.00000000 0.00000000
+
+[R1_Lamin B1_RF 775+DAPI.jpg]
+method: ECC
+score: 0.7857022771304475
+size_adjustment: none
+warp_matrix:
+1.00000000 0.00000000 -0.01068388
+0.00000000 1.00000000 -0.24368168
+
+[Spleen_CD206_Cy5_DAPI_RGB.tif]
+method: ECC
+score: 0.16052723966422128
+size_adjustment: center_crop (1856x2344 -> 1856x2320)
+warp_matrix:
+1.00000000 0.00000000 -7.04242468
+0.00000000 1.00000000 27.12398338
+
+[Spleen_CD31_Cy3_DAPI_RGB_RGB.tif]
+method: ECC
+score: 0.17788902098180498
+size_adjustment: center_crop (1856x2344 -> 1856x2320)
+warp_matrix:
+1.00000000 0.00000000 -8.52817249
+0.00000000 1.00000000 25.68914223
+

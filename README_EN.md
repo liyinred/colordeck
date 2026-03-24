@@ -15,6 +15,8 @@ ColorDeck is a Python tool designed for the registration and merging of Multiple
 - **Multiple Motion Models**: Supports Translation, Euclidean, and Affine transformations
 - **Registration Quality Visualization**: Automatically generates registration preview images
 - **Batch Processing**: Process all images in a folder with a single command
+- **Automatic Size Matching**: Center-crops or resamples non-reference images to the reference size before registration
+- **Overview Panel Output**: Generates a single panel containing every input fluorescence image plus the final merged result
 - **Detailed Logging**: Records transformation matrices and registration scores for each image
 
 ---
@@ -75,6 +77,7 @@ merged_output_YYYYMMDD_HHMMSS/
 │   ├── image2_registration_check.png
 │   └── ...
 ├── merged_image.png          # Final merged image
+├── input_and_merged_overview.png  # Input images + merged result overview
 └── transform_info.txt        # Transformation matrices and registration scores
 ```
 
@@ -85,6 +88,7 @@ merged_output_YYYYMMDD_HHMMSS/
 | `aligned_images/` | Contains all registered images |
 | `registration_previews/` | Registration quality visualization (Red = reference DAPI, Green = aligned DAPI, Yellow = overlap) |
 | `merged_image.png` | Result of pixel-wise maximum merging of all images |
+| `input_and_merged_overview.png` | Grid overview that combines all original input fluorescence images and the final merged image |
 | `transform_info.txt` | Records registration method, score, and transformation matrix for each image |
 
 ---
@@ -121,7 +125,7 @@ When the ECC algorithm fails (translation model only), the program automatically
 
 ## Notes
 
-1. **Image Size**: All input images must have the same dimensions
+1. **Image Size**: Non-reference images are automatically matched to the reference size before registration, using center crop first and resizing when needed
 2. **Reference Image Selection**: Choose an image with clear DAPI signal and clean background as reference
 3. **Motion Model Selection**:
    - `translation`: For cases with only translation, fastest
