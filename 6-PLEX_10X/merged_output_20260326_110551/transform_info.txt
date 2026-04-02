@@ -1,0 +1,56 @@
+input_folder: 6-PLEX_10X
+output_dir: 6-PLEX_10X\merged_output_20260326_110551
+reference_image: R2_CD68_RF 525+DAPI.jpg
+overview_image: input_and_merged_overview.png
+motion: translation
+dapi_channel: b
+reference_size: 1856x2320
+
+[R2_CD68_RF 525+DAPI.jpg]
+method: reference
+score: 1.0
+size_adjustment: none
+warp_matrix:
+1.00000000 0.00000000 0.00000000
+0.00000000 1.00000000 0.00000000
+
+[R1_CD3_RF 675+DAPI-2.jpg]
+method: ECC
+score: 0.8812083825525117
+size_adjustment: none
+warp_matrix:
+1.00000000 0.00000000 0.54518598
+0.00000000 1.00000000 4.01117277
+
+[R1_Lamin B1_RF 775+DAPI-2.jpg]
+method: ECC
+score: 0.9175792983745344
+size_adjustment: none
+warp_matrix:
+1.00000000 0.00000000 14.78391933
+0.00000000 1.00000000 -1.24870420
+
+[R2_KI67_RF 555+DAPI.jpg]
+method: ECC
+score: 0.9998993384460929
+size_adjustment: none
+warp_matrix:
+1.00000000 0.00000000 -0.00002315
+0.00000000 1.00000000 -0.00714178
+
+[Spleen_CD206_Cy5_DAPI.tif]
+method: ECC
+score: 0.1569972395499726
+size_adjustment: center_crop (1856x2344 -> 1856x2320)
+warp_matrix:
+1.00000000 0.00000000 -3.12977076
+0.00000000 1.00000000 24.42805290
+
+[Spleen_CD31_Cy3_DAPI.tif]
+method: ECC
+score: 0.17050363443391867
+size_adjustment: center_crop (1856x2344 -> 1856x2320)
+warp_matrix:
+1.00000000 0.00000000 -5.01885080
+0.00000000 1.00000000 22.69608307
+

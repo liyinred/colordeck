@@ -1,0 +1,40 @@
+input_folder: ColorDeck_15x
+output_dir: ColorDeck_15x\merged_output_20260324_171706
+reference_image: Spleen_Lamin B1_RF 775+DAPI.jpg
+overview_image: input_and_merged_overview.png
+motion: translation
+dapi_channel: b
+reference_size: 1856x2320
+
+[Spleen_Lamin B1_RF 775+DAPI.jpg]
+method: reference
+score: 1.0
+size_adjustment: none
+warp_matrix:
+1.00000000 0.00000000 0.00000000
+0.00000000 1.00000000 0.00000000
+
+[Spleen_CD3_RF 675+DAPI.jpg]
+method: ECC
+score: 0.8180226745232606
+size_adjustment: none
+warp_matrix:
+1.00000000 0.00000000 0.01476499
+0.00000000 1.00000000 0.28502896
+
+[Spleen_CD68_RF 525+DAPI.jpg]
+method: ECC
+score: 0.9226222778429474
+size_adjustment: none
+warp_matrix:
+1.00000000 0.00000000 -0.50982106
+0.00000000 1.00000000 -1.38904333
+
+[Spleen_Ki67_RF 555+DAPI.jpg]
+method: ECC
+score: 0.9226854446482403
+size_adjustment: none
+warp_matrix:
+1.00000000 0.00000000 -0.50934798
+0.00000000 1.00000000 -1.38749039
+
